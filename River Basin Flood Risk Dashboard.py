@@ -442,7 +442,6 @@ def plot_water_level_trend(water_level_df, days=30):
 # Generate water level trend plot
 water_level_plot = plot_water_level_trend(water_level_df)
 
-# Function to create rainfall comparison with historical average
 def plot_rainfall_historical_comparison(rainfall_df, days=365):
     end_date = pd.to_datetime('2025-04-20')
     start_date = end_date - pd.Timedelta(days=days)
@@ -454,13 +453,23 @@ def plot_rainfall_historical_comparison(rainfall_df, days=365):
     recent_data['month'] = recent_data['date'].dt.month
     recent_data['year'] = recent_data['date'].dt.year
     
+    # First calculate the number of days in each month for scaling
+    days_in_month = recent_data.groupby(['year', 'month']).size().reset_index(name='days_count')
+    
+    # Now calculate the monthly aggregates
     monthly_data = recent_data.groupby(['year', 'month']).agg({
         'rainfall_mm': 'sum',
-        'historical_avg_mm': lambda x: x.mean() * pd.DatetimeIndex(recent_data['date']).days_in_month.mean()
+        'historical_avg_mm': 'mean'  # Just take the mean of the historical averages
     }).reset_index()
     
-    # Create date strings for x-axis
-    monthly_data['date_str'] = monthly_data.apply(lambda x: f"{x['year']}-{x['month']:02d}", axis=1)
+    # Merge with the days count
+    monthly_data = pd.merge(monthly_data, days_in_month, on=['year', 'month'])
+    
+    # Scale the historical average by the number of days
+    monthly_data['historical_avg_mm'] = monthly_data['historical_avg_mm'] * monthly_data['days_count']
+    
+    # Convert month to integer before formatting
+    monthly_data['date_str'] = monthly_data.apply(lambda x: f"{int(x['year'])}-{int(x['month']):02d}", axis=1)
     
     # Create figure
     fig = go.Figure()
